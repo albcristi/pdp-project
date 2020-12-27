@@ -5,6 +5,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -19,8 +20,9 @@ public class Image {
     private Integer[][] gValues;
     private Integer[][] bValues;
     private Integer[][] grayScale;
+    private Integer imagetType;
 
-    public Image(String path, ExecutorService threadPool){
+    public Image(String path, ExecutorService threadPool) throws ExecutionException, InterruptedException {
         BufferedImage image = null;
         try {
             this.threadPool = threadPool;
@@ -28,12 +30,15 @@ public class Image {
             image = ImageIO.read(file);
             height = image.getHeight();
             width = image.getWidth();
-            toRgbAndGrayScale(image);
+            imagetType = image.getType();
+
         }
+
         catch (Exception e){
             System.out.println(e.getMessage());
             System.exit(-1);
         }
+        toRgbAndGrayScale(image);
     }
 
     private void toRgbAndGrayScale(BufferedImage image) throws ExecutionException, InterruptedException {
@@ -75,6 +80,13 @@ public class Image {
                 if(row.equals(height))
                     break;
             }
+
+            System.out.println("-------");
+            System.out.println(row);
+            System.out.println(column);
+            System.out.println(width);
+            System.out.println(height);
+
             Color rgb = new Color(image.getRGB(row, column));
             rValues[row][column] = rgb.getRed();
             gValues[row][column] = rgb.getGreen();
@@ -105,5 +117,67 @@ public class Image {
         if(orderNo%noColumns==0)
             return new PairElement<>(orderNo/noColumns-1, noColumns-1);
         return new PairElement<>(orderNo/noColumns, orderNo%noColumns-1);
+    }
+
+
+    private void processGrayScaleSetting(PairElement<Integer,Integer> startCoordinates,
+                                           Integer numberOfElements, BufferedImage image){
+        Integer row = startCoordinates.first;
+        Integer column = startCoordinates.second;
+        Integer computed = 0;
+        while (computed < numberOfElements && row < height){
+            if(column.equals(width)){
+                column = 0;
+                row++;
+                if(row.equals(height))
+                    break;
+            }
+
+
+            Color rgb = new Color(grayScale[row][column], grayScale[row][column], grayScale[row][column]);
+            image.setRGB(row, column, rgb.getRGB());
+            computed++;
+            column++;
+        }
+
+    }
+
+    public void writeToFileGrayScale(){
+
+        try {
+            Integer noElementsPerThread = (width * height) / Main.NO_THREADS.get();
+            Integer order = 1;
+            List<Future<Boolean>> tasks = new ArrayList<>();
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            for (int i = 0; i < Main.NO_THREADS.get(); ++i) {
+                if (i + 1 == Main.NO_THREADS.get())
+                    noElementsPerThread += (width * height) % Main.NO_THREADS.get();
+                PairElement<Integer, Integer> startCoordinates = getElementCoordinates(width, order);
+                Integer finalNoElementsPerThread = noElementsPerThread;
+                Future<Boolean> task = threadPool.submit(() -> {
+                    processGrayScaleSetting(startCoordinates, finalNoElementsPerThread, image);
+                    return true;
+                });
+                tasks.add(task);
+                order += noElementsPerThread;
+            }
+
+            for (Future<Boolean> task : tasks) {
+                task.get();
+            }
+
+            File outputFile = new File("./output/grayscale.png");
+
+            ImageIO.write(image, "png", outputFile);
+
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
     }
 }

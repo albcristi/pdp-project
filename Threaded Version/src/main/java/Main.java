@@ -6,10 +6,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Main {
     public static AtomicInteger NO_THREADS = new AtomicInteger(5);
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
         ExecutorService service = Executors.newFixedThreadPool(NO_THREADS.get());
-        Image img = new Image("./data/img1.png", service);
+        Image img = new Image("./data/img2.jpg", service);
 
+//        img.writeToFileGrayScale();
         service.shutdownNow();
     }
 }
