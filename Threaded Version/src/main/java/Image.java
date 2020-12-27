@@ -20,7 +20,7 @@ public class Image {
     private Integer[][] bValues;
     private Integer[][] grayScale;
 
-    public Image(String path, ExecutorService threadPool) throws ExecutionException, InterruptedException {
+    public Image(String path, ExecutorService threadPool){
         BufferedImage image = null;
         try {
             this.threadPool = threadPool;
@@ -28,13 +28,12 @@ public class Image {
             image = ImageIO.read(file);
             height = image.getHeight();
             width = image.getWidth();
+            toRgbAndGrayScale(image);
         }
         catch (Exception e){
             System.out.println(e.getMessage());
             System.exit(-1);
         }
-        toRgbAndGrayScale(image);
-
     }
 
     private void toRgbAndGrayScale(BufferedImage image) throws ExecutionException, InterruptedException {
@@ -88,7 +87,6 @@ public class Image {
         }
 
     }
-
 
     private static PairElement<Integer,Integer> getElementCoordinates(Integer noColumns, Integer orderNo){
         /*
