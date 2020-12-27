@@ -20,7 +20,6 @@ public class Image {
     private Integer[][] gValues;
     private Integer[][] bValues;
     private Integer[][] grayScale;
-    private Integer imagetType;
 
     public Image(String path, ExecutorService threadPool) throws ExecutionException, InterruptedException {
         BufferedImage image = null;
@@ -28,10 +27,8 @@ public class Image {
             this.threadPool = threadPool;
             File file = new File(path);
             image = ImageIO.read(file);
-            height = image.getHeight();
-            width = image.getWidth();
-            imagetType = image.getType();
-
+            height = image.getWidth();
+            width = image.getHeight();
         }
 
         catch (Exception e){
@@ -80,13 +77,6 @@ public class Image {
                 if(row.equals(height))
                     break;
             }
-
-            System.out.println("-------");
-            System.out.println(row);
-            System.out.println(column);
-            System.out.println(width);
-            System.out.println(height);
-
             Color rgb = new Color(image.getRGB(row, column));
             rValues[row][column] = rgb.getRed();
             gValues[row][column] = rgb.getGreen();
@@ -148,7 +138,7 @@ public class Image {
             Integer noElementsPerThread = (width * height) / Main.NO_THREADS.get();
             Integer order = 1;
             List<Future<Boolean>> tasks = new ArrayList<>();
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            BufferedImage image = new BufferedImage(height, width, BufferedImage.TYPE_INT_RGB);
             for (int i = 0; i < Main.NO_THREADS.get(); ++i) {
                 if (i + 1 == Main.NO_THREADS.get())
                     noElementsPerThread += (width * height) % Main.NO_THREADS.get();
@@ -177,7 +167,6 @@ public class Image {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
 
     }
 }
