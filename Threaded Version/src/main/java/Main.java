@@ -8,8 +8,8 @@ public class Main {
 
     public static void main(String[] args) throws ExecutionException, InterruptedException {
         ExecutorService service = Executors.newFixedThreadPool(NO_THREADS.get());
-        Image img = new Image("./data/img2.jpg", service);
-
+        Image img = new Image("./data/img3.PNG", service);
+        img.applySobelFilter();
         img.writeToFileGrayScale();
         service.shutdownNow();
     }

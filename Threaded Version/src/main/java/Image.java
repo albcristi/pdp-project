@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Image {
     private ExecutorService threadPool;
@@ -20,6 +21,9 @@ public class Image {
     private Integer[][] gValues;
     private Integer[][] bValues;
     private Integer[][] grayScale;
+    private Integer[][] sobelFilterApplied;
+    ReentrantLock sobelLock = new ReentrantLock();
+    Integer maxGradient = -1;
 
     public Image(String path, ExecutorService threadPool) throws ExecutionException, InterruptedException {
         BufferedImage image = null;
@@ -36,6 +40,18 @@ public class Image {
             System.exit(-1);
         }
         toRgbAndGrayScale(image);
+    }
+
+    public Integer[][] getGrayScale(){
+        return grayScale;
+    }
+
+    public Integer getHeight(){
+        return height;
+    }
+
+    public Integer getWidth(){
+        return width;
     }
 
     private void toRgbAndGrayScale(BufferedImage image) throws ExecutionException, InterruptedException {
@@ -160,12 +176,87 @@ public class Image {
 
             ImageIO.write(image, "png", outputFile);
 
-        } catch (InterruptedException e) {
+        } catch (InterruptedException | ExecutionException | IOException e) {
             e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        }
+
+    }
+
+    public Integer[][] applySobelFilter(Integer threshHoldValue) throws ExecutionException, InterruptedException {
+        sobelFilterApplied = new Integer[height][width];
+
+        for(int i=0; i<height; i++){
+            sobelFilterApplied[i][0] = grayScale[i][0];
+            sobelFilterApplied[i][width-1] =  grayScale[i][width-1];
+        }
+        for(int i=0; i<width; i++){
+            sobelFilterApplied[0][i] = grayScale[0][i];
+            sobelFilterApplied[height-1][i] =  grayScale[height-1][i];
+        }
+        List<Future<Boolean>> tasks = new ArrayList<>();
+        Integer noElemsPerTask = (width*height)/Main.NO_THREADS.get();
+        Integer order = 1;
+        for(int i=0; i<Main.NO_THREADS.get(); i++){
+            if(i+1==Main.NO_THREADS.get())
+                noElemsPerTask+= (width*height)%Main.NO_THREADS.get();
+            Integer finalNoElemsPerTask = noElemsPerTask;
+            Integer finalOrder = order;
+            tasks.add(threadPool.submit(()->{
+                sobelTask(getElementCoordinates(width, finalOrder), finalNoElemsPerTask);
+                return true;
+            }));
+            order+=noElemsPerTask;
+        }
+        for(Future<Boolean> task: tasks)
+            task.get();
+        grayScale = sobelFilterApplied;
+        return sobelFilterApplied;
+    }
+
+    public void sobelTask(PairElement<Integer, Integer> startCoordinates, Integer noElements, Integer threshHild){
+        Integer i = startCoordinates.first;
+        Integer j = startCoordinates.second;
+        Integer computed = 0;
+        while (computed < noElements && i < height) {
+            if (j.equals(width)) {
+                j = 0;
+                i++;
+                if (i.equals(height))
+                    break;
+            }
+            if (i != 0 && i != height - 1 && j != 0 && j != width - 1) {
+                int val00 = grayScale[i - 1][j - 1];
+                int val01 = grayScale[i - 1][j];
+                int val02 = grayScale[i - 1][j + 1];
+                int val10 = grayScale[i][j - 1];
+                int val11 = grayScale[i][j];
+                int val12 = grayScale[i][j + 1];
+                int val20 = grayScale[i + 1][j - 1];
+                int val21 = grayScale[i + 1][j];
+                int val22 = grayScale[i + 1][j + 1];
+
+                int gx = ((-1 * val00) + (0 * val01) + (1 * val02))
+                        + ((-2 * val10) + (0 * val11) + (2 * val12))
+                        + ((-1 * val20) + (0 * val21) + (1 * val22));
+
+                int gy = ((-1 * val00) + (-2 * val01) + (-1 * val02))
+                        + ((0 * val10) + (0 * val11) + (0 * val12))
+                        + ((1 * val20) + (2 * val21) + (1 * val22));
+                double gval = Math.sqrt((gx * gx) + (gy * gy));
+                int g = (int) gval;
+                sobelLock.lock();
+                if (maxGradient < g) {
+                    maxGradient = g;
+                }
+                sobelLock.unlock();
+                sobelFilterApplied[i][j] = g;
+                if (g > 255)
+                    sobelFilterApplied[i][j] = 255;
+                if (g < 0)
+                    sobelFilterApplied[i][j] = 0;
+            }
+            j++;
+            computed++;
         }
 
     }
