@@ -8,11 +8,10 @@ public class Main {
 
     public static void main(String[] args) throws ExecutionException, InterruptedException {
         ExecutorService service = Executors.newFixedThreadPool(NO_THREADS.get());
-        Image img = new Image("./data/img3.jpg", service);
+        Image img = new Image("./data/img1.jpeg", service);
         HoughTransform houghTransform = new HoughTransform(img, service);
-        img.writeToFileImage(img.applySobelFilter(),"./output/sobel-filtered-img.png","png");
         houghTransform.putLinesOnImage();
-        img.writeImageToFile("./output/final.png","png");
+        img.writeImageToFile("./output/final.jpeg","jpeg");
         service.shutdownNow();
     }
 }
