@@ -24,6 +24,7 @@ public class Image {
     private Integer[][] sobelFilterApplied;
     ReentrantLock sobelLock = new ReentrantLock();
     Integer maxGradient = -1;
+    Integer threshold = 0;
 
     public Image(String path, ExecutorService threadPool) throws ExecutionException, InterruptedException {
         BufferedImage image = null;
@@ -182,7 +183,7 @@ public class Image {
 
     }
 
-    public Integer[][] applySobelFilter(Integer threshHoldValue) throws ExecutionException, InterruptedException {
+    public Integer[][] applySobelFilter() throws ExecutionException, InterruptedException {
         sobelFilterApplied = new Integer[height][width];
 
         for(int i=0; i<height; i++){
@@ -213,7 +214,7 @@ public class Image {
         return sobelFilterApplied;
     }
 
-    public void sobelTask(PairElement<Integer, Integer> startCoordinates, Integer noElements, Integer threshHild){
+    public void sobelTask(PairElement<Integer, Integer> startCoordinates, Integer noElements){
         Integer i = startCoordinates.first;
         Integer j = startCoordinates.second;
         Integer computed = 0;
@@ -254,10 +255,16 @@ public class Image {
                     sobelFilterApplied[i][j] = 255;
                 if (g < 0)
                     sobelFilterApplied[i][j] = 0;
+
+                if(sobelFilterApplied[i][j] < 128)
+                    sobelFilterApplied[i][j] = 0;
+                else
+                    sobelFilterApplied[i][j] = 255;
             }
             j++;
             computed++;
         }
 
     }
+
 }
