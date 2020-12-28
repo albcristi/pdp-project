@@ -1,9 +1,6 @@
-import jdk.internal.net.http.common.Pair;
-
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -22,9 +19,11 @@ public class Image {
     private Integer[][] bValues;
     private Integer[][] grayScale;
     private Integer[][] sobelFilterApplied;
+    private Integer[][] imgForFile;
+
     ReentrantLock sobelLock = new ReentrantLock();
     Integer maxGradient = -1;
-    Integer threshold = 0;
+
 
     public Image(String path, ExecutorService threadPool) throws ExecutionException, InterruptedException {
         BufferedImage image = null;
@@ -42,6 +41,7 @@ public class Image {
         }
         toRgbAndGrayScale(image);
     }
+
 
     public Integer[][] getGrayScale(){
         return grayScale;
@@ -127,10 +127,13 @@ public class Image {
     }
 
 
-    private void processGrayScaleSetting(PairElement<Integer,Integer> startCoordinates,
-                                           Integer numberOfElements, BufferedImage image){
+    private void writeImageToFileTask(PairElement<Integer,Integer> startCoordinates,
+                                      Integer numberOfElements, BufferedImage image){
         Integer row = startCoordinates.first;
         Integer column = startCoordinates.second;
+        Integer height, width;
+        height = imgForFile.length;
+        width = imgForFile[0].length;
         Integer computed = 0;
         while (computed < numberOfElements && row < height){
             if(column.equals(width)){
@@ -139,9 +142,7 @@ public class Image {
                 if(row.equals(height))
                     break;
             }
-
-
-            Color rgb = new Color(grayScale[row][column], grayScale[row][column], grayScale[row][column]);
+            Color rgb = new Color(imgForFile[row][column], imgForFile[row][column], imgForFile[row][column]);
             image.setRGB(row, column, rgb.getRGB());
             computed++;
             column++;
@@ -149,9 +150,12 @@ public class Image {
 
     }
 
-    public void writeToFileGrayScale(){
-
+    public void writeToFileImage(Integer[][] img, String location, String format){
         try {
+            Integer height, width;
+            height = img.length;
+            width = img[0].length;;
+            imgForFile = img;
             Integer noElementsPerThread = (width * height) / Main.NO_THREADS.get();
             Integer order = 1;
             List<Future<Boolean>> tasks = new ArrayList<>();
@@ -162,7 +166,7 @@ public class Image {
                 PairElement<Integer, Integer> startCoordinates = getElementCoordinates(width, order);
                 Integer finalNoElementsPerThread = noElementsPerThread;
                 Future<Boolean> task = threadPool.submit(() -> {
-                    processGrayScaleSetting(startCoordinates, finalNoElementsPerThread, image);
+                    writeImageToFileTask(startCoordinates, finalNoElementsPerThread, image);
                     return true;
                 });
                 tasks.add(task);
@@ -173,14 +177,13 @@ public class Image {
                 task.get();
             }
 
-            File outputFile = new File("./output/grayscale.png");
+            File outputFile = new File(location);
 
-            ImageIO.write(image, "png", outputFile);
+            ImageIO.write(image, format, outputFile);
 
         } catch (InterruptedException | ExecutionException | IOException e) {
             e.printStackTrace();
         }
-
     }
 
     public Integer[][] applySobelFilter() throws ExecutionException, InterruptedException {
@@ -267,4 +270,73 @@ public class Image {
 
     }
 
+
+    public void setPixel(PairElement<Integer, Integer> coordinates, Integer r, Integer g, Integer b){
+        System.out.println("-s-fjisduhsd");
+        System.out.println(coordinates);
+        System.out.println(height);
+        System.out.println(width);
+        if(coordinates.first < 0 || coordinates.first>height || coordinates.second<0 || coordinates.second>width)
+            return;
+        System.out.println(r);
+        System.out.println(g);
+        this.rValues[coordinates.first][coordinates.second] = r;
+        this.gValues[coordinates.first][coordinates.second] = g;
+        this.bValues[coordinates.first][coordinates.second] = b;
+    }
+
+    public Boolean containsPixel(PairElement<Integer, Integer> pixel){
+        return pixel.first>=0&&pixel.second>=0&&pixel.first<height&&pixel.second<width;
+    }
+    public void writeImageToFile(String location, String format){
+        try {
+            Integer noElementsPerThread = (width * height) / Main.NO_THREADS.get();
+            Integer order = 1;
+            List<Future<Boolean>> tasks = new ArrayList<>();
+            BufferedImage image = new BufferedImage(height, width, BufferedImage.TYPE_INT_RGB);
+            for (int i = 0; i < Main.NO_THREADS.get(); ++i) {
+                if (i + 1 == Main.NO_THREADS.get())
+                    noElementsPerThread += (width * height) % Main.NO_THREADS.get();
+                PairElement<Integer, Integer> startCoordinates = getElementCoordinates(width, order);
+                Integer finalNoElementsPerThread = noElementsPerThread;
+                Future<Boolean> task = threadPool.submit(() -> {
+                    writeColoredImageToFile(startCoordinates, finalNoElementsPerThread, image);
+                    return true;
+                });
+                tasks.add(task);
+                order += noElementsPerThread;
+            }
+
+            for (Future<Boolean> task : tasks) {
+                task.get();
+            }
+
+            File outputFile = new File(location);
+
+            ImageIO.write(image, format, outputFile);
+
+        } catch (InterruptedException | ExecutionException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void  writeColoredImageToFile(PairElement<Integer,Integer> startCoordinates,
+                                          Integer numberOfElements, BufferedImage image){
+        Integer row = startCoordinates.first;
+        Integer column = startCoordinates.second;
+        Integer computed = 0;
+        while (computed < numberOfElements && row < height){
+            if(column.equals(width)){
+                column = 0;
+                row++;
+                if(row.equals(height))
+                    break;
+            }
+            Color rgb = new Color(rValues[row][column], gValues[row][column], bValues[row][column]);
+            image.setRGB(row, column, rgb.getRGB());
+            computed++;
+            column++;
+        }
+
+    }
 }

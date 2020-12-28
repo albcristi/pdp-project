@@ -6,4 +6,12 @@ public class PairElement<K,T> {
         this.first = first;
         this.second = second;
     }
+
+    @Override
+    public String toString() {
+        return "PairElement{" +
+                "first=" + first +
+                ", second=" + second +
+                '}';
+    }
 }
