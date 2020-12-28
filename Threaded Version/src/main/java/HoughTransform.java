@@ -23,18 +23,18 @@ public class HoughTransform {
         executeHoughTransform();
     }
 
-    private void executeHoughTransform(){
-        Integer initialR = (int) Math.sqrt(image.getWidth()*image.getWidth()+image.getHeight()*image.getHeight());
+    private void executeHoughTransform() {
+        Integer initialR = (int) Math.sqrt(image.getWidth() * image.getWidth() + image.getHeight() * image.getHeight());
         System.out.println(houghArray[0].length);
-        for(int x=0; x<image.getHeight(); x++)
-            for(int y=0; y<image.getWidth(); y++)
-                if(filteredImage[x][y] !=0){
-                    for(int angle=0; angle<180; angle++){
-                         Integer r = (int) (x* Math.cos(Math.toRadians(angle)) + y*Math.sin(Math.toRadians(angle)));
-                         houghArray[angle][r+initialR] += 1;
-                         if(houghArray[angle][r+initialR] > globalMaximum){
-                             globalMaximum = houghArray[angle][r+initialR];
-                         }
+        for (int x = 0; x < image.getHeight(); x++)
+            for (int y = 0; y < image.getWidth(); y++)
+                if (filteredImage[x][y] != 0) {
+                    for (int angle = 0; angle < 180; angle++) {
+                        Integer r = (int) (x * Math.cos(Math.toRadians(angle)) + y * Math.sin(Math.toRadians(angle)));
+                        houghArray[angle][r + initialR] += 1;
+                        if (houghArray[angle][r + initialR] > globalMaximum) {
+                            globalMaximum = houghArray[angle][r + initialR];
+                        }
 
                     }
                 }
@@ -42,14 +42,44 @@ public class HoughTransform {
 //        if(globalMaximum > 260)
 //            globalMaximum = 255;
 
-        for(int x=0; x<180; x++) {
+        for (int x = 0; x < 180; x++) {
             for (int y = 0; y < 2 * initialR; y++) {
-                houghArray[x][y] = houghArray[x][y]> 0.3*globalMaximum ? houghArray[x][y] : 0;
-                if(houghArray[x][y] > 255)
-                    houghArray[x][y] = 255;
+                if (houghArray[x][y] < 0.3 * globalMaximum)
+                    houghArray[x][y] = 0;
+//                if(houghArray[x][y] > 255)
+//                    houghArray[x][y] = 255;
             }
         }
 
+        int neighbourhoodSize = 10;
+        // Search for local peaks above threshold to draw
+        for (int t = 0; t < 180; t++) {
+            loop:
+            for (int r = neighbourhoodSize; r < 2 * initialR - neighbourhoodSize; r++) {
+
+                // Only consider points above threshold
+                if (houghArray[t][r] > 0.3 * globalMaximum) {
+
+                    int peak = houghArray[t][r];
+
+                    // Check that this peak is indeed the local maxima
+                    for (int dx = -neighbourhoodSize; dx <= neighbourhoodSize; dx++) {
+                        for (int dy = -neighbourhoodSize; dy <= neighbourhoodSize; dy++) {
+                            int dt = t + dx;
+                            int dr = r + dy;
+                            if (dt < 0) dt = dt + 180;
+                            else if (dt >= 180) dt = dt - 180;
+                            if (houghArray[dt][dr] > peak) {
+                                // found a bigger point nearby, skip
+                                houghArray[t][r] = 0;
+                                continue loop;
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
     }
 
     public Integer[][] getHoughArray(){
@@ -58,51 +88,25 @@ public class HoughTransform {
 
     public List<PairElement<Integer, Integer>> getEdgePoints(){
         List<PairElement<Integer, Integer>> points = new ArrayList<>();
-        Integer initialR = (int) Math.sqrt(image.getWidth()*image.getWidth()+image.getHeight()*image.getHeight());
+        int initialR = (int) Math.sqrt(image.getWidth()*image.getWidth()+image.getHeight()*image.getHeight());
         for(int angle=0; angle<180; angle++)
             for(int r=0; r<houghArray[0].length; r++)
-            if(houghArray[angle][r] != 0){
-//                for(int i=0; i<image.getHeight(); i++)
-//                    for(int j=0; j<image.getWidth(); j++) {
-////                        System.out.println("-==-=-");
-////                        System.out.println((int) (i * Math.cos(Math.toRadians(angle) + j * Math.sin(Math.toRadians(angle)))));
-////                        System.out.println(r);
-//                        if ((int) (i * Math.cos(Math.toRadians(angle) + j * Math.sin(Math.toRadians(angle)))) == r-initialR) {
-//                            points.add(new PairElement<>(i, j));
-//                        }
-//                    }
-                Integer x, y;
-                x = (int) (r*Math.cos(Math.toRadians(angle)))-initialR;
-                y = (int) (r*Math.sin(Math.toRadians(angle)))-initialR;
-                PairElement<Integer, Integer> point = new PairElement<>(x,y);
-                if(!image.containsPixel(point)){
-                    Integer x1,y1,x2,y2, maxLength;
-                    maxLength = (int) (Math.sqrt(image.getWidth()*image.getWidth()+image.getHeight()*image.getHeight()));
-                    x1 = x + maxLength + (int) (r*Math.cos(Math.toRadians(angle))) -initialR;
-                    y1 = y+ maxLength+ (int) (r*Math.sin(Math.toRadians(angle))) -initialR;
-                    if(image.containsPixel(new PairElement<>(x1,y1))){
-                        points.add(new PairElement<>(x1,y1));
+            if(houghArray[angle][r] != 0) {
+                for (int i = 0; i < image.getHeight(); i++)
+                    for (int j = 0; j < image.getWidth(); j++) {
+
+                        if (j == (int)((-Math.cos(Math.toRadians(angle))/Math.sin(Math.toRadians(angle))) * i + (r - initialR)/Math.sin(Math.toRadians(angle))) ){
+
+                            points.add(new PairElement<>(i, j));
+                        }
                     }
-                    else{
-                        x2 = x - maxLength + (int) (r*Math.cos(Math.toRadians(angle))) -initialR;
-                        y2 = y - maxLength+ (int) (r*Math.sin(Math.toRadians(angle))) -initialR;
-                        if(image.containsPixel(new PairElement<>(x2,y2)))
-                            points.add(new PairElement<>(x2,y2));
-                    }
-                }
-                else {
-                    points.add(new PairElement<>(x, y));
-                }
             }
         return points;
     }
     public void putLinesOnImage(){
         List<PairElement<Integer, Integer>> points = getEdgePoints();
         for(PairElement<Integer, Integer> p1: points){
-//            for(PairElement<Integer, Integer> p2: points)
-//                if(!p1.first.equals(p2.first) && !p1.second.equals(p2.second)){
                     image.setPixel(p1,124,252,0);
-                    //image.setPixel(p2,124,252,0);
                 }
     }
 }

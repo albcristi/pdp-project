@@ -272,14 +272,14 @@ public class Image {
 
 
     public void setPixel(PairElement<Integer, Integer> coordinates, Integer r, Integer g, Integer b){
-        System.out.println("-s-fjisduhsd");
-        System.out.println(coordinates);
-        System.out.println(height);
-        System.out.println(width);
+//        System.out.println("-s-fjisduhsd");
+//        System.out.println(coordinates);
+//        System.out.println(height);
+//        System.out.println(width);
         if(coordinates.first < 0 || coordinates.first>height || coordinates.second<0 || coordinates.second>width)
             return;
-        System.out.println(r);
-        System.out.println(g);
+//        System.out.println(r);
+//        System.out.println(g);
         this.rValues[coordinates.first][coordinates.second] = r;
         this.gValues[coordinates.first][coordinates.second] = g;
         this.bValues[coordinates.first][coordinates.second] = b;
