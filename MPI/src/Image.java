@@ -1,5 +1,5 @@
 import mpi.MPI;
-import mpjdev.MPJDev;
+import mpi.Min;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -17,12 +17,19 @@ public class Image implements Serializable {
     public static int RGB_AND_GRAY_RESULT_B_TAG = 5;
     public static int RGB_AND_GRAY_RESULT_GS_TAG = 6;
 
-    // TAGS FOR WRITE TO FILE IMG
+    // TAGS FOR WRITE TO FILE IMG  -- Image Construction
     public static int WRITE_FILE_IN_SIZE_TAG = 7;
     public static int WRITE_FILE_IN_R_TAG = 8;
     public static int WRITE_FILE_IN_G_TAG = 9;
     public static int WRITE_FILE_IN_B_TAG = 10;
     public static int WRITE_FILE_RESULT_IMG_TAG = 11;
+    
+    // SOBEL
+    public static int SOBEL_IN_PARAMS_TAG = 12;
+    public static int SOBEL_IN_GRAY_SCALE_TAG = 13;
+    public static int SOBEL_RES_ARRAY = 15;
+
+    
 
     private int[][] rValues;
     private int[][] gValues;
@@ -202,6 +209,23 @@ public class Image implements Serializable {
         System.out.println("Worker ID: "+MPI.COMM_WORLD.Rank()+" finished write to file -prepare image");
     }
 
+    public void writeToFIle(){
+        BufferedImage image = new BufferedImage(height, width, BufferedImage.TYPE_INT_RGB);
+        for(int i=0; i<height; i++)
+            for(int j=0; j<width; j++){
+                image.setRGB(i,j,
+                        new Color(sobelFilterApplied[i][j],sobelFilterApplied[i][j],sobelFilterApplied[i][j]).getRGB());
+            }
+        try{
+            File outputFile = new File("./output/sobel.png");
+
+            ImageIO.write(image, "PNG", outputFile);
+        }
+        catch (Exception e){
+            System.exit(-1);
+        }
+    }
+
     public void writeImageToFileMaster(String pathToImage, String format){
 //        BufferedImage image = new BufferedImage(height, width, BufferedImage.TYPE_INT_RGB);
 //        for(int i=0; i<height; i++)
@@ -221,9 +245,9 @@ public class Image implements Serializable {
             return;
         int noElementsPerNode = (width*height)/Main.noOfProcesses;
         int order = 1;
-        int[] rm = new int[noElementsPerNode];
-        int[] gm = new int[noElementsPerNode];
-        int[] bm = new int[noElementsPerNode];
+        int[] rm = new int[noElementsPerNode+(width * height) % Main.noOfProcesses];
+        int[] gm = new int[noElementsPerNode+(width * height) % Main.noOfProcesses];
+        int[] bm = new int[noElementsPerNode+(width * height) % Main.noOfProcesses];
         for(int i=0; i<Main.noOfProcesses; ++i){
             if(i+1==Main.noOfProcesses) {
                 noElementsPerNode += (width * height) % Main.noOfProcesses;
@@ -298,6 +322,170 @@ public class Image implements Serializable {
         catch (Exception e){
             System.out.println(e.getMessage());
             System.exit(-1);
+        }
+    }
+
+    public static void applySobelWorker(){
+        int[] dim = new int[5];
+        MPI.COMM_WORLD.Recv(dim, 0, 5, MPI.INT, 0,
+                Image.SOBEL_IN_PARAMS_TAG);
+        System.out.println("Worker ID:"+MPI.COMM_WORLD.Rank()+" --> started applySobelWorker");
+        int[][] gray = new int[dim[0]][dim[1]];
+        MPI.COMM_WORLD.Recv(gray, 0, dim[0], MPI.OBJECT, 0,
+                Image.SOBEL_IN_GRAY_SCALE_TAG);
+        Integer i = dim[3];
+        Integer j = dim[4];
+        Integer computed = 0;
+        int[] sobelValues = new int[dim[2]];
+        int idx = 0;
+        while (computed < dim[2] && i < dim[0]) {
+            if (j==dim[1]) {
+                j = 0;
+                i++;
+                if (i == dim[0])
+                    break;
+            }
+            if (i != 0 && i != dim[0] - 1 && j != 0 && j != dim[1] - 1) {
+                int val00 = gray[i - 1][j - 1];
+                int val01 = gray[i - 1][j];
+                int val02 = gray[i - 1][j + 1];
+                int val10 = gray[i][j - 1];
+                int val11 = gray[i][j];
+                int val12 = gray[i][j + 1];
+                int val20 = gray[i + 1][j - 1];
+                int val21 = gray[i + 1][j];
+                int val22 = gray[i + 1][j + 1];
+
+                int gx = ((-1 * val00) + (0 * val01) + (1 * val02))
+                        + ((-2 * val10) + (0 * val11) + (2 * val12))
+                        + ((-1 * val20) + (0 * val21) + (1 * val22));
+
+                int gy = ((-1 * val00) + (-2 * val01) + (-1 * val02))
+                        + ((0 * val10) + (0 * val11) + (0 * val12))
+                        + ((1 * val20) + (2 * val21) + (1 * val22));
+                double gval = Math.sqrt((gx * gx) + (gy * gy));
+                int g = (int) gval;
+
+                sobelValues[idx] = Math.min(g, 255);
+                sobelValues[idx] = Math.max(sobelValues[idx], 0);
+                if(sobelValues[idx] >= 128)
+                    sobelValues[idx] = 255;
+                else
+                    sobelValues[idx] = 0;
+                idx++;
+            }
+            j++;
+            computed++;
+        }
+        MPI.COMM_WORLD.Send(sobelValues, 0, dim[2], MPI.INT, 0,
+                Image.SOBEL_RES_ARRAY);
+        System.out.println("Worker ID:"+MPI.COMM_WORLD.Rank()+" --> finished applySobelWorker");
+    }
+
+    public void applySobelMaster(){
+        sobelFilterApplied = new int [height][width];
+
+        for(int i=0; i<height; i++){
+            sobelFilterApplied[i][0] = grayScale[i][0];
+            sobelFilterApplied[i][width-1] =  grayScale[i][width-1];
+        }
+        for(int i=0; i<width; i++){
+            sobelFilterApplied[0][i] = grayScale[0][i];
+            sobelFilterApplied[height-1][i] =  grayScale[height-1][i];
+        }
+        int noElementsPerNode = (width*height)/Main.noOfProcesses;
+        int order = 1;
+        int[] values = new int[2];
+        for(int i =0; i<Main.noOfProcesses; i++){
+            if(Main.noOfProcesses == i+1){
+                noElementsPerNode += (width*height)%Main.noOfProcesses;
+                values = new int[noElementsPerNode];
+            }
+            else{
+                int[] dimensions = new int[5];
+                dimensions[0] = height; dimensions[1] = width; dimensions[2] = noElementsPerNode;
+                dimensions[3] = getElementCoordinates(width, order).first;
+                dimensions[4] = getElementCoordinates(width, order).second;
+                MPI.COMM_WORLD.Ssend(dimensions, 0, 5, MPI.INT, i+1,
+                        Image.SOBEL_IN_PARAMS_TAG);
+                MPI.COMM_WORLD.Ssend(grayScale,0 , height, MPI.OBJECT, i+1,
+                        Image.SOBEL_IN_GRAY_SCALE_TAG);
+                order+= noElementsPerNode;
+            }
+        }
+        // master does its part
+        Integer i = getElementCoordinates(width, order).first;
+        Integer j = getElementCoordinates(width, order).second;
+        Integer computed = 0;
+        int idx = 0;
+        while (computed < noElementsPerNode && i < height) {
+            if (j.equals(width)) {
+                j = 0;
+                i++;
+                if (i.equals(height))
+                    break;
+            }
+
+            if (i != 0 && i != height - 1 && j != 0 && j !=width - 1) {
+                int val00 = grayScale[i - 1][j - 1];
+                int val01 = grayScale[i - 1][j];
+                int val02 = grayScale[i - 1][j + 1];
+                int val10 = grayScale[i][j - 1];
+                int val11 = grayScale[i][j];
+                int val12 = grayScale[i][j + 1];
+                int val20 = grayScale[i + 1][j - 1];
+                int val21 = grayScale[i + 1][j];
+                int val22 = grayScale[i + 1][j + 1];
+
+                int gx = ((-1 * val00) + (0 * val01) + (1 * val02))
+                        + ((-2 * val10) + (0 * val11) + (2 * val12))
+                        + ((-1 * val20) + (0 * val21) + (1 * val22));
+
+                int gy = ((-1 * val00) + (-2 * val01) + (-1 * val02))
+                        + ((0 * val10) + (0 * val11) + (0 * val12))
+                        + ((1 * val20) + (2 * val21) + (1 * val22));
+                double gval = Math.sqrt((gx * gx) + (gy * gy));
+                int g = (int) gval;
+
+                values[idx] = Math.min(g, 255);
+                values[idx] = Math.max(values[idx], 0);
+                if(values[idx] >= 128)
+                    values[idx] = 255;
+                else
+                    values[idx] = 0;
+                idx++;
+            }
+            j++;
+            computed++;
+        }
+
+        order = 1;
+        // retrieve data
+        noElementsPerNode = (width*height)/Main.noOfProcesses;
+        for(int ii=0; ii<Main.noOfProcesses; ii++){
+            int[] res;
+            if(Main.noOfProcesses == ii+1){
+               res = values;
+               noElementsPerNode += (width*height)%Main.noOfProcesses;
+            }
+            else{
+                res = new int[noElementsPerNode];
+                MPI.COMM_WORLD.Recv(res, 0, noElementsPerNode, MPI.INT, ii+1,
+                        Image.SOBEL_RES_ARRAY);
+            }
+            for(int jj=0; jj<noElementsPerNode; jj++){
+                if(getElementCoordinates(width, order).first == 0 ||
+                    getElementCoordinates(width, order).first+1 == height ||
+                    getElementCoordinates(width, order).second == 0 ||
+                    getElementCoordinates(width, order).second +1 == width) {
+                    order++;
+                    continue;
+                }
+                sobelFilterApplied[getElementCoordinates(width,order).first][getElementCoordinates(width, order).second]
+                        = res[jj];
+                order++;
+            }
+
         }
     }
 }
