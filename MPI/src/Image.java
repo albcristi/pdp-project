@@ -100,7 +100,7 @@ public class Image implements Serializable {
             if(i+1==Main.noOfProcesses) {
                 noElementsPerNode += (width * height) % Main.noOfProcesses;
                 for(int j=0; j<noElementsPerNode; j++){
-                    PairElement<Integer, Integer> coordinates = getElementCoordinates(width, order+i);
+                    PairElement<Integer, Integer> coordinates = getElementCoordinates(width, order+j);
                     masterValues[j] = image.getRGB(coordinates.first, coordinates.second);
                 }
             }
@@ -108,7 +108,7 @@ public class Image implements Serializable {
                 // Step1 - build array of rgb values from start to end
                 int[] values = new int[noElementsPerNode];
                 for(int j=0; j<noElementsPerNode; j++){
-                    PairElement<Integer, Integer> coordinates = getElementCoordinates(width, order+i);
+                    PairElement<Integer, Integer> coordinates = getElementCoordinates(width, order+j);
                     values[j] = image.getRGB(coordinates.first, coordinates.second);
                 }
                 // Step2 - send array
@@ -118,7 +118,7 @@ public class Image implements Serializable {
                 size[0] =  noElementsPerNode;
                 MPI.COMM_WORLD.Ssend(size,0,1,MPI.INT, i+1,
                         Image.RGB_AND_GRAY_INPUT_ARRAY_SIZE_TAG);
-                MPI.COMM_WORLD.Ssend(values, 0, values.length, MPI.INT, i+1,
+                MPI.COMM_WORLD.Ssend(values, 0, size[0], MPI.INT, i+1,
                         Image.RGB_AND_GRAY_INPUT_ARRAY_TAG);
                 order += noElementsPerNode;
             }
@@ -203,21 +203,20 @@ public class Image implements Serializable {
     }
 
     public void writeImageToFileMaster(String pathToImage, String format){
-        BufferedImage image = new BufferedImage(height, width, BufferedImage.TYPE_INT_RGB);
-        for(int i=0; i<height; i++)
-            for(int j=0; j<width; j++){
-                image.setRGB(i,j,
-                        new Color(rValues[i][j], gValues[i][j], bValues[i][j]).getRGB());
-            }
-        try{
-            File outputFile = new File(pathToImage);
-
-            ImageIO.write(image, format, outputFile);
-        }
-        catch (Exception e){
-            System.exit(-1);
-        }
-        /*
+//        BufferedImage image = new BufferedImage(height, width, BufferedImage.TYPE_INT_RGB);
+//        for(int i=0; i<height; i++)
+//            for(int j=0; j<width; j++){
+//                image.setRGB(i,j,
+//                        new Color(rValues[i][j], gValues[i][j], bValues[i][j]).getRGB());
+//            }
+//        try{
+//            File outputFile = new File(pathToImage);
+//
+//            ImageIO.write(image, format, outputFile);
+//        }
+//        catch (Exception e){
+//            System.exit(-1);
+//        }
         if(MPI.COMM_WORLD.Rank() != 0)
             return;
         int noElementsPerNode = (width*height)/Main.noOfProcesses;
@@ -229,7 +228,7 @@ public class Image implements Serializable {
             if(i+1==Main.noOfProcesses) {
                 noElementsPerNode += (width * height) % Main.noOfProcesses;
                 for(int j=0; j<noElementsPerNode; j++){
-                    PairElement<Integer, Integer> coordinates = getElementCoordinates(width, order+i);
+                    PairElement<Integer, Integer> coordinates = getElementCoordinates(width, order+j);
                     rm[j] = rValues[coordinates.first][coordinates.second];
                     gm[j] = gValues[coordinates.first][coordinates.second];
                     bm[j] = bValues[coordinates.first][coordinates.second];
@@ -241,7 +240,7 @@ public class Image implements Serializable {
                 int[] g = new int[noElementsPerNode];
                 int[] b = new int[noElementsPerNode];
                 for(int j=0; j<noElementsPerNode; j++){
-                    PairElement<Integer, Integer> coordinates = getElementCoordinates(width, order+i);
+                    PairElement<Integer, Integer> coordinates = getElementCoordinates(width, order+j);
                     r[j] = rValues[coordinates.first][coordinates.second];
                     g[j] = gValues[coordinates.first][coordinates.second];
                     b[j] = bValues[coordinates.first][coordinates.second];
@@ -300,7 +299,5 @@ public class Image implements Serializable {
             System.out.println(e.getMessage());
             System.exit(-1);
         }
-
-         */
     }
 }

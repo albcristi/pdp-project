@@ -22,7 +22,7 @@ public class Main {
             // all events will 'happen' sequentially
             // firstly we will construct the RGB and GrayScale 2D arrays
             Image.toRgbAndGrayScaleWorker();
-            //Image.writeToFileWorker();
+            Image.writeToFileWorker();
         }
         MPI.Finalize();
     }
