@@ -374,6 +374,10 @@ public class Image implements Serializable {
                     sobelValues[idx] = 0;
                 idx++;
             }
+            else {
+                sobelValues[idx] = 0;
+                idx++;
+            }
             j++;
             computed++;
         }
@@ -453,6 +457,10 @@ public class Image implements Serializable {
                     values[idx] = 255;
                 else
                     values[idx] = 0;
+                idx++;
+            }
+            else {
+                values[idx] = 0;
                 idx++;
             }
             j++;
