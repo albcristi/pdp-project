@@ -153,6 +153,7 @@ public class HoughTransform {
         // TODO: PARALLELIZE
         for (int x = 0; x < 180; x++) {
             for (int y = 0; y < 2 * rValue; y++) {
+                System.out.println(houghArray[x][y]);
                 if (houghArray[x][y] < THRESHOLD * globalMaximum)
                     houghArray[x][y] = 0;
             }
@@ -296,7 +297,10 @@ public class HoughTransform {
     }
 
     public Image putLinesOnImage(){
-        findEdgePointsMaster();
-        return null;
+        List<PairElement<Integer, Integer>> points = findEdgePointsMaster();
+        for(PairElement<Integer, Integer> point: points){
+            image.setPixel(point, 124,252,0);
+        }
+        return image;
     }
 }

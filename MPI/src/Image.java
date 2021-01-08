@@ -508,4 +508,12 @@ public class Image implements Serializable {
 
         }
     }
+
+    public void setPixel(PairElement<Integer, Integer> coordinates, Integer r, Integer g, Integer b){
+        if(coordinates.first < 0 || coordinates.first>height || coordinates.second<0 || coordinates.second>width)
+            return;
+        this.rValues[coordinates.first][coordinates.second] = r;
+        this.gValues[coordinates.first][coordinates.second] = g;
+        this.bValues[coordinates.first][coordinates.second] = b;
+    }
 }

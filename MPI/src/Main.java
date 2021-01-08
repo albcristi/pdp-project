@@ -11,9 +11,9 @@ public class Main {
         int me = MPI.COMM_WORLD.Rank();
         Main.noOfProcesses = MPI.COMM_WORLD.Size();
         if(me == 0){
-            Image im = new Image("./data/img.PNG");
+            Image im = new Image("./data/img3.PNG");
             HoughTransform houghTransform = new HoughTransform(im);
-            houghTransform.putLinesOnImage();
+            im = houghTransform.putLinesOnImage();
             im.writeImageToFileMaster("./output/result.PNG", "PNG");
         }
         else{
