@@ -3,10 +3,7 @@ import mpi.*;
 public class Main {
     public static Integer noOfProcesses;
 
-
-
     public static void main(String[] args) {
-        // write your code here
         MPI.Init(args);
         int me = MPI.COMM_WORLD.Rank();
         Main.noOfProcesses = MPI.COMM_WORLD.Size();
