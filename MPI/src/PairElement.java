@@ -1,4 +1,6 @@
-public class PairElement<K,T> {
+import java.io.Serializable;
+
+public class PairElement<K,T> implements Serializable {
     public K first;
     public T second;
 

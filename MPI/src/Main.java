@@ -12,8 +12,8 @@ public class Main {
         Main.noOfProcesses = MPI.COMM_WORLD.Size();
         if(me == 0){
             Image im = new Image("./data/img.PNG");
-            im.applySobelMaster();
-            im.writeToFIle();
+            HoughTransform houghTransform = new HoughTransform(im);
+            houghTransform.putLinesOnImage();
             im.writeImageToFileMaster("./output/result.PNG", "PNG");
         }
         else{
@@ -21,6 +21,8 @@ public class Main {
             // firstly we will construct the RGB and GrayScale 2D arrays
             Image.toRgbAndGrayScaleWorker();
             Image.applySobelWorker();
+            HoughTransform.buildHoughArrayWorker();
+            HoughTransform.findEdgePointsWorker();
             Image.writeToFileWorker();
 
         }

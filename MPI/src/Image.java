@@ -56,6 +56,18 @@ public class Image implements Serializable {
         toRgbAndGrayScaleMaster(image);
     }
 
+    public int getWidth(){
+        return this.width;
+    }
+
+    public int getHeight(){
+        return this.height;
+    }
+
+    public int[][] getSobelImage(){
+        return this.sobelFilterApplied;
+    }
+
     private static PairElement<Integer,Integer> getElementCoordinates(Integer noColumns, Integer orderNo){
         if(orderNo%noColumns==0)
             return new PairElement<>(orderNo/noColumns-1, noColumns-1);
