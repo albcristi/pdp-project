@@ -15,6 +15,7 @@ public class HoughTransform {
     private Integer[][] filteredImage;
     private Integer globalMaximum = -1;
     private static Double THRESHOLD = 0.3;
+    private ReentrantLock gmaxLock = new ReentrantLock();
 
     public HoughTransform(Image image, ExecutorService threadPool) throws ExecutionException, InterruptedException {
         this.image = image;
@@ -39,27 +40,29 @@ public class HoughTransform {
     }
 
     private void executeHoughTransformTask(PairElement<Integer, Integer> startCoordinates,
-                                           Integer noElems, Integer[][] image){
+                                           Integer noElems){
         Integer row = startCoordinates.first;
         Integer column = startCoordinates.second;
-        Integer computed = 0;
+        int computed = 0;
         Integer initialR = (int) Math.sqrt(this.image.getWidth() * this.image.getWidth()
                 + this.image.getHeight() * this.image.getHeight());
-        while (computed < noElems && row < image.length){
-            if(column.equals(image[0].length)){
+        while (computed < noElems && row < image.getHeight()){
+            if(column.equals(image.getWidth())){
                 column = 0;
                 row++;
-                if(row.equals(image.length))
+                if(row.equals(image.getHeight()))
                     break;
             }
-            if (image[row][column] != 0) {
+            if (filteredImage[row][column] != 0) {
                 for (int angle = 0; angle < 180; angle++) {
                     Integer r = (int) (row * Math.cos(Math.toRadians(angle)) + column * Math.sin(Math.toRadians(angle)));
                     houghElemsLock[angle][r+initialR].lock();
                     houghArray[angle][r + initialR] += 1;
+                    gmaxLock.lock();
                     if (houghArray[angle][r + initialR] > globalMaximum) {
                         globalMaximum = houghArray[angle][r + initialR];
                     }
+                    gmaxLock.unlock();
                     houghElemsLock[angle][r+initialR].unlock();
 
                 }
@@ -70,24 +73,24 @@ public class HoughTransform {
     }
 
     private void executeHoughTransform() throws ExecutionException, InterruptedException {
-        Integer initialR = (int) Math.sqrt(image.getWidth() * image.getWidth() + image.getHeight() * image.getHeight());
-        Integer elemsPerTask = (image.getHeight()*image.getWidth())/Main.NO_THREADS.get();
+        int initialR = (int) Math.sqrt(image.getWidth() * image.getWidth() + image.getHeight() * image.getHeight());
+        int elemsPerTask = (image.getHeight()*image.getWidth())/Main.NO_THREADS.get();
         Integer order = 1;
         List<Future<Boolean>> tasks = new ArrayList<>();
-        for(int task=0; task<Main.NO_THREADS.get(); ++task){
-            if(task+1==Main.NO_THREADS.get()){
-                elemsPerTask += (image.getHeight()*image.getWidth())%Main.NO_THREADS.get();
-                PairElement<Integer, Integer> start = getCoordinates(order, image.getWidth());
-                Integer finalElemsPerTask = elemsPerTask;
-                tasks.add(threadPool.submit(()->{
-                    executeHoughTransformTask(start, finalElemsPerTask, filteredImage);
-                    return true;
-                }));
+        for(int task=0; task<Main.NO_THREADS.get(); ++task) {
+            if (task + 1 == Main.NO_THREADS.get()) {
+                elemsPerTask += (image.getHeight() * image.getWidth()) % Main.NO_THREADS.get();
             }
+            PairElement<Integer, Integer> start = getCoordinates(order, image.getWidth());
+            Integer finalElemsPerTask = elemsPerTask;
+            tasks.add(threadPool.submit(() -> {
+                executeHoughTransformTask(start, finalElemsPerTask);
+                return true;
+            }));
+            order += elemsPerTask;
         }
         for(Future<Boolean> task: tasks)
             task.get();
-
         houghWithoutThreshHold = houghArray;
         for (int x = 0; x < 180; x++) {
             for (int y = 0; y < 2 * initialR; y++) {
